@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: parking
+
+server:
+  port: 9200
+  servlet:
+    context-path: /pk/api/
+
+
+
