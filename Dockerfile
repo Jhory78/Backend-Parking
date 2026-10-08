@@ -23,6 +23,6 @@ USER spring
 # Copia el JAR desde la etapa de build
 COPY --from=builder /app/target/*.jar app.jar
 
-EXPOSE 8080
+EXPOSE 9200
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
