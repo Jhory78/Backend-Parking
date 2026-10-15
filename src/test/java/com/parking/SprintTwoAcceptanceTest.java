@@ -58,7 +58,8 @@ class SprintTwoAcceptanceTest {
 
     @BeforeEach
     void resetParkingLot() throws Exception {
-        jdbc.update("UPDATE parking_spaces SET status = 'AVAILABLE'");
+        jdbc.update("DELETE FROM vehicle_entries");
+        jdbc.update("UPDATE parking_spaces SET status = 'AVAILABLE', current_plate = NULL, occupied_since = NULL");
         spaceService.synchronizeEntryBarrier();
         adminBearer = bearer("admin@parking.com", "Admin123*");
     }
@@ -167,11 +168,11 @@ class SprintTwoAcceptanceTest {
             changeStatus("C-02", "AVAILABLE").andExpect(status().isOk());
 
             String content = streamContent(stream);
+            String changedSpace = "{\"id\":%d,\"code\":\"C-02\",\"vehicleType\":\"CAR\",\"status\":\"%s\","
+                    + "\"currentPlate\":null,\"occupiedSince\":null}";
             assertThat(content)
-                    .contains("{\"id\":%d,\"code\":\"C-02\",\"vehicleType\":\"CAR\",\"status\":\"OCCUPIED\"}"
-                            .formatted(spaceId("C-02")))
-                    .contains("{\"id\":%d,\"code\":\"C-02\",\"vehicleType\":\"CAR\",\"status\":\"AVAILABLE\"}"
-                            .formatted(spaceId("C-02")));
+                    .contains(changedSpace.formatted(spaceId("C-02"), "OCCUPIED"))
+                    .contains(changedSpace.formatted(spaceId("C-02"), "AVAILABLE"));
         }
 
         @Test

@@ -2,8 +2,8 @@
 
 Backend del sistema de gestión de parqueadero — Grupo 5 (Desarrollo 2).
 
-API REST con autenticación JWT, gestión de cuentas de operarios y monitoreo de ocupación de
-espacios en tiempo real. Arquitectura hexagonal: ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+API REST con autenticación JWT, gestión de cuentas de operarios, monitoreo de ocupación de
+espacios en tiempo real e ingreso y salida de vehículos por placa (OCR) con asignación automática de plaza. Arquitectura hexagonal: ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | | |
 |---|---|
@@ -60,6 +60,9 @@ Al arrancar se crea, si no existe, el administrador definido en `APP_ADMIN_EMAIL
 | `APP_ADMIN_NAME`, `APP_ADMIN_EMAIL`, `APP_ADMIN_PASSWORD` | Administrador inicial | —, `admin@parking.com`, — |
 | `APP_CORS_ALLOWED_ORIGINS` | Orígenes del frontend | `http://localhost:4200` |
 | `APP_SPACES_STREAM_TIMEOUT` | Duración de cada conexión en tiempo real | `30m` |
+| `APP_OCR_PLATE_RECOGNIZER_API_KEY` | API key de [Plate Recognizer](https://platerecognizer.com). Sin ella el OCR responde 422 y el ingreso es manual | — |
+| `APP_OCR_CONFIDENCE_THRESHOLD` | Por debajo, la lectura se marca `lowConfidence` | `0.80` |
+| `APP_OCR_TIMEOUT` | Tiempo máximo de espera del OCR | `10s` |
 
 ## Seguridad
 
@@ -85,9 +88,16 @@ Todas las rutas son relativas a `/pk/api` y, salvo login y logout, requieren `Au
 | `GET` | `/spaces/occupancy` | autenticado | 19, 21, 22 |
 | `PATCH` | `/spaces/{id}/status` | autenticado | 16 |
 | `GET` | `/spaces/stream` (SSE) | autenticado | 16, 20 |
+| `POST` | `/entries/recognize` (multipart, campo `image`) | autenticado | 01, 02, 04, 11 |
+| `POST` | `/entries` | autenticado | 03–11 |
+| `POST` | `/entries/exit` | autenticado | — |
+| `GET` | `/entries/active` | autenticado | 10 |
 
 Los errores siempre tienen el formato `ApiError`: `timestamp`, `status`, `error`, `message`, `path` y,
 en errores de validación, `fieldErrors`.
+
+El contrato detallado de ingresos y salidas para el frontend está en
+[docs/API-INGRESOS-SALIDAS.md](docs/API-INGRESOS-SALIDAS.md).
 
 ## Tests
 

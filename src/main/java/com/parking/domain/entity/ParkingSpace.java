@@ -14,6 +14,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 /**
  * A parking space for one vehicle type.
  * <p>
@@ -45,6 +47,14 @@ public class ParkingSpace {
     @Version
     private Long version;
 
+    /** Plate of the registered vehicle parked here; null when free or occupied by hand. */
+    @Column(name = "current_plate", length = 10)
+    private String currentPlate;
+
+    /** Entry time of the registered vehicle; null when free or occupied by hand. */
+    @Column(name = "occupied_since")
+    private Instant occupiedSince;
+
     public static ParkingSpace available(String code, VehicleType vehicleType) {
         ParkingSpace space = new ParkingSpace();
         space.code = code;
@@ -53,6 +63,7 @@ public class ParkingSpace {
         return space;
     }
 
+    /** Manual occupation (RF-16): no vehicle is registered, so there is no plate. */
     public void occupy() {
         if (isOccupied()) {
             throw new InvalidSpaceStatusChangeException("El espacio %s ya está ocupado".formatted(code));
@@ -60,11 +71,32 @@ public class ParkingSpace {
         status = SpaceStatus.OCCUPIED;
     }
 
+    /** RF-09: the space is assigned to a registered vehicle. */
+    public void assignTo(LicensePlate plate, Instant entryTime) {
+        occupy();
+        currentPlate = plate.value();
+        occupiedSince = entryTime;
+    }
+
+    /** Manual release (RF-16). A registered vehicle frees its space only through its exit. */
     public void release() {
         if (!isOccupied()) {
             throw new InvalidSpaceStatusChangeException("El espacio %s ya está disponible".formatted(code));
         }
+        if (hasRegisteredVehicle()) {
+            throw new InvalidSpaceStatusChangeException("La plaza tiene un vehículo registrado; registra su salida");
+        }
         status = SpaceStatus.AVAILABLE;
+    }
+
+    /** Exit of the registered vehicle. */
+    public void vacate() {
+        if (!isOccupied()) {
+            throw new InvalidSpaceStatusChangeException("El espacio %s ya está disponible".formatted(code));
+        }
+        status = SpaceStatus.AVAILABLE;
+        currentPlate = null;
+        occupiedSince = null;
     }
 
     public void changeStatus(SpaceStatus newStatus) {
@@ -77,5 +109,9 @@ public class ParkingSpace {
 
     public boolean isOccupied() {
         return status == SpaceStatus.OCCUPIED;
+    }
+
+    public boolean hasRegisteredVehicle() {
+        return currentPlate != null;
     }
 }

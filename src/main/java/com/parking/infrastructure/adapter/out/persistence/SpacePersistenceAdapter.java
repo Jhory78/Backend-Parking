@@ -32,6 +32,13 @@ public class SpacePersistenceAdapter implements SpaceRepositoryPort {
     }
 
     @Override
+    public Optional<ParkingSpace> lockFirstAvailable(VehicleType vehicleType) {
+        return springDataRepository.lockAllByVehicleType(vehicleType).stream()
+                .filter(space -> !space.isOccupied())
+                .findFirst();
+    }
+
+    @Override
     public ParkingSpace save(ParkingSpace space) {
         return springDataRepository.save(space);
     }

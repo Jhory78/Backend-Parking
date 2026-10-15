@@ -16,5 +16,11 @@ public interface SpaceRepositoryPort {
 
     Optional<ParkingSpace> findById(Long spaceId);
 
+    /**
+     * First available space of the type in code order. Must lock until the transaction ends so
+     * that concurrent entries wait for each other and never get the same space.
+     */
+    Optional<ParkingSpace> lockFirstAvailable(VehicleType vehicleType);
+
     ParkingSpace save(ParkingSpace space);
 }

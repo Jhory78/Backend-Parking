@@ -24,7 +24,8 @@ public class SpaceRestMapper {
     private static final Locale SPANISH = Locale.forLanguageTag("es-CO");
 
     public SpaceResponse toResponse(ParkingSpace space) {
-        return new SpaceResponse(space.getId(), space.getCode(), space.getVehicleType(), space.getStatus());
+        return new SpaceResponse(space.getId(), space.getCode(), space.getVehicleType(), space.getStatus(),
+                space.getCurrentPlate(), space.getOccupiedSince());
     }
 
     public List<SpaceResponse> toResponses(List<ParkingSpace> spaces) {

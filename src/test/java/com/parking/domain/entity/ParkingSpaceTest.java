@@ -3,10 +3,14 @@ package com.parking.domain.entity;
 import com.parking.domain.exception.InvalidSpaceStatusChangeException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ParkingSpaceTest {
+
+    private static final Instant ENTRY_TIME = Instant.parse("2026-10-14T15:30:00Z");
 
     @Test
     void newSpaceIsAvailable() {
@@ -44,6 +48,61 @@ class ParkingSpaceTest {
         assertThatThrownBy(space::release)
                 .isInstanceOf(InvalidSpaceStatusChangeException.class)
                 .hasMessage("El espacio M-03 ya está disponible");
+    }
+
+    @Test
+    void manualOccupationHasNoPlate() {
+        ParkingSpace space = ParkingSpace.available("C-01", VehicleType.CAR);
+
+        space.occupy();
+
+        assertThat(space.getCurrentPlate()).isNull();
+        assertThat(space.getOccupiedSince()).isNull();
+        assertThat(space.hasRegisteredVehicle()).isFalse();
+    }
+
+    @Test
+    void assignToStoresThePlateAndEntryTime() {
+        ParkingSpace space = ParkingSpace.available("C-01", VehicleType.CAR);
+
+        space.assignTo(LicensePlate.of("ABC123"), ENTRY_TIME);
+
+        assertThat(space.isOccupied()).isTrue();
+        assertThat(space.getCurrentPlate()).isEqualTo("ABC123");
+        assertThat(space.getOccupiedSince()).isEqualTo(ENTRY_TIME);
+    }
+
+    @Test
+    void cannotAssignAnOccupiedSpace() {
+        ParkingSpace space = ParkingSpace.available("C-01", VehicleType.CAR);
+        space.occupy();
+
+        assertThatThrownBy(() -> space.assignTo(LicensePlate.of("ABC123"), ENTRY_TIME))
+                .isInstanceOf(InvalidSpaceStatusChangeException.class)
+                .hasMessage("El espacio C-01 ya está ocupado");
+    }
+
+    @Test
+    void spaceWithARegisteredVehicleCannotBeReleasedByHand() {
+        ParkingSpace space = ParkingSpace.available("C-01", VehicleType.CAR);
+        space.assignTo(LicensePlate.of("ABC123"), ENTRY_TIME);
+
+        assertThatThrownBy(space::release)
+                .isInstanceOf(InvalidSpaceStatusChangeException.class)
+                .hasMessage("La plaza tiene un vehículo registrado; registra su salida");
+        assertThat(space.isOccupied()).isTrue();
+    }
+
+    @Test
+    void vacateFreesTheSpaceAndForgetsTheVehicle() {
+        ParkingSpace space = ParkingSpace.available("C-01", VehicleType.CAR);
+        space.assignTo(LicensePlate.of("ABC123"), ENTRY_TIME);
+
+        space.vacate();
+
+        assertThat(space.getStatus()).isEqualTo(SpaceStatus.AVAILABLE);
+        assertThat(space.getCurrentPlate()).isNull();
+        assertThat(space.getOccupiedSince()).isNull();
     }
 
     @Test

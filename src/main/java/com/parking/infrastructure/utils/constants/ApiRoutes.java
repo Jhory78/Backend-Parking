@@ -20,6 +20,11 @@ public final class ApiRoutes {
     public static final String SPACES_OCCUPANCY = "/occupancy";
     public static final String SPACES_STREAM = "/stream";
 
+    public static final String ENTRIES = "/entries";
+    public static final String ENTRIES_RECOGNIZE = "/recognize";
+    public static final String ENTRIES_EXIT = "/exit";
+    public static final String ENTRIES_ACTIVE = "/active";
+
     private ApiRoutes() {
     }
 }

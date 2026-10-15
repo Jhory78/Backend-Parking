@@ -18,6 +18,11 @@ spring:
   flyway:
     # Adopts databases created before Flyway (Sprint 1) as version 1
     baseline-on-migrate: true
+  servlet:
+    multipart:
+      # Hard limit (413). Plate photos above 5 MB are rejected before this with a 400 field error
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 server:
   port: 9200
@@ -38,3 +43,12 @@ app:
     stream:
       # Real-time connections are renewed by the client after this time
       timeout: ${APP_SPACES_STREAM_TIMEOUT:30m}
+  ocr:
+    # Readings below this confidence are flagged for the operator to check
+    confidence-threshold: ${APP_OCR_CONFIDENCE_THRESHOLD:0.80}
+    timeout: ${APP_OCR_TIMEOUT:10s}
+    plate-recognizer:
+      url: ${APP_OCR_PLATE_RECOGNIZER_URL:https://api.platerecognizer.com/v1/plate-reader/}
+      # Without a key every photo falls back to manual entry
+      api-key: ${APP_OCR_PLATE_RECOGNIZER_API_KEY:}
+      regions: ${APP_OCR_PLATE_RECOGNIZER_REGIONS:co}
