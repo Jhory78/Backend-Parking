@@ -1,0 +1,50 @@
+# render.yaml — Render Infrastructure-as-Code blueprint
+# Docs: https://docs.render.com/infrastructure-as-code
+
+databases:
+  - name: parking-db
+    plan: free                # cambiar a "starter" para producción
+    databaseName: parking_db
+    user: parking_user
+
+services:
+  - type: web
+    name: parking-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    rootDir: Parking
+    plan: free                # cambiar a "starter" para producción
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: parking-db
+          property: connectionURI
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: parking-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: parking-db
+          property: password
+      - key: APP_JWT_SECRET
+        generateValue: true
+      - key: APP_JWT_EXPIRATION
+        value: "24h"
+      - key: APP_ADMIN_NAME
+        value: "Administrador"
+      - key: APP_ADMIN_EMAIL
+        value: "admin@parking.com"
+      - key: APP_ADMIN_PASSWORD
+        generateValue: true
+      - key: APP_CORS_ALLOWED_ORIGINS
+        value: "https://tu-frontend.onrender.com"  # ← actualizar con la URL real
+      - key: APP_OCR_PLATE_RECOGNIZER_API_KEY
+        sync: false           # configurar manualmente en el dashboard
+      - key: APP_OCR_CONFIDENCE_THRESHOLD
+        value: "0.80"
+      - key: APP_OCR_TIMEOUT
+        value: "10s"
+      - key: APP_SPACES_STREAM_TIMEOUT
+        value: "30m"
