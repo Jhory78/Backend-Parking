@@ -38,7 +38,7 @@ app:
     email: ${APP_ADMIN_EMAIL:admin@parking.com}
     password: ${APP_ADMIN_PASSWORD}
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,https://parking-frontend-eight.vercel.app}
   spaces:
     stream:
       # Real-time connections are renewed by the client after this time

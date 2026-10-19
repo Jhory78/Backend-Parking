@@ -19,7 +19,9 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        // Patterns (e.g. https://*.vercel.app) are accepted alongside credentials; plain origins
+        // reject "*" when credentials are allowed and fail every request with a 500.
+        configuration.setAllowedOriginPatterns(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of(
                 HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(),
                 HttpMethod.PATCH.name(), HttpMethod.DELETE.name(), HttpMethod.OPTIONS.name()));
