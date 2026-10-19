@@ -23,6 +23,6 @@ USER spring
 # Copia el JAR desde la etapa de build
 COPY --from=builder /app/target/*.jar app.jar
 
-EXPOSE 9200
+EXPOSE ${PORT:-9200}
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java -Dserver.port=${PORT:-9200} -jar app.jar"]
