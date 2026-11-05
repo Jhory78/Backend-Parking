@@ -25,6 +25,10 @@ public final class ApiRoutes {
     public static final String ENTRIES_EXIT = "/exit";
     public static final String ENTRIES_ACTIVE = "/active";
 
+    public static final String BACKUPS = "/backups";
+    public static final String BACKUP_BY_NAME = "/{fileName}";
+    public static final String BACKUP_RESTORE = "/{fileName}/restore";
+
     private ApiRoutes() {
     }
 }

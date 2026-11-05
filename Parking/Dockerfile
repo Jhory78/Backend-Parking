@@ -16,8 +16,12 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
+# pg_dump y psql para las copias de seguridad
+RUN apk add --no-cache postgresql-client
+
 # Usuario no-root por seguridad
 RUN addgroup -S spring && adduser -S spring -G spring
+RUN mkdir -p /app/backups && chown spring:spring /app/backups
 USER spring
 
 # Copia el JAR desde la etapa de build

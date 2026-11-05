@@ -43,6 +43,10 @@ app:
     stream:
       # Real-time connections are renewed by the client after this time
       timeout: ${APP_SPACES_STREAM_TIMEOUT:30m}
+  backup:
+    # Directory where the database copies are stored
+    directory: ${APP_BACKUP_DIRECTORY:backups}
+    timeout: ${APP_BACKUP_TIMEOUT:5m}
   ocr:
     # Readings below this confidence are flagged for the operator to check
     confidence-threshold: ${APP_OCR_CONFIDENCE_THRESHOLD:0.80}

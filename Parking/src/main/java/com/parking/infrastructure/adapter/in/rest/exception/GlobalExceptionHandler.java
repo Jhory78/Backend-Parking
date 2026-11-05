@@ -1,5 +1,6 @@
 package com.parking.infrastructure.adapter.in.rest.exception;
 
+import com.parking.domain.exception.BackupFailedException;
 import com.parking.domain.exception.AccountDisabledException;
 import com.parking.domain.exception.BusinessRuleException;
 import com.parking.domain.exception.FieldValidationException;
@@ -7,6 +8,7 @@ import com.parking.domain.exception.InvalidCredentialsException;
 import com.parking.domain.exception.PlateNotRecognizedException;
 import com.parking.domain.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -34,6 +36,7 @@ import java.util.Map;
  * Security filter errors (missing token, forbidden role) are routed here too
  * by {@code SecurityErrorHandler}, so every error shares the same format.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -81,6 +84,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(HttpServletRequest request) {
         return ApiError.response(HttpStatus.FORBIDDEN, "No tiene permisos para esta operación", request);
+    }
+
+    @ExceptionHandler(BackupFailedException.class)
+    public ResponseEntity<ApiError> handleBackupFailed(BackupFailedException ex, HttpServletRequest request) {
+        log.error("Database backup operation failed", ex);
+        return ApiError.response(HttpStatus.INTERNAL_SERVER_ERROR,
+                "No se pudo completar la operación de copia de seguridad", request);
     }
 
     // ── HTTP and persistence ────────────────────────────────────────
