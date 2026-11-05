@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -539,6 +540,7 @@ class SprintThreeAcceptanceTest {
         @Test
         void concurrentEntriesNeverShareASpace() throws Exception {
             int cars = 25;
+            Long adminId = jdbc.queryForObject("SELECT id FROM users WHERE email = 'admin@parking.com'", Long.class);
             CountDownLatch start = new CountDownLatch(1);
             ExecutorService executor = Executors.newFixedThreadPool(cars);
             List<Future<VehicleEntry>> results = new ArrayList<>();
@@ -547,7 +549,7 @@ class SprintThreeAcceptanceTest {
                     String plate = "CAR%03d".formatted(i);
                     results.add(executor.submit(() -> {
                         start.await();
-                        return registerEntryUseCase.registerEntry(new RegisterEntryCommand(plate, null));
+                        return registerEntryUseCase.registerEntry(new RegisterEntryCommand(plate, null, adminId));
                     }));
                 }
                 start.countDown();
@@ -624,8 +626,160 @@ class SprintThreeAcceptanceTest {
         @Test
         void requiresAuthentication() throws Exception {
             mvc.perform(get("/entries/active")).andExpect(status().isUnauthorized());
+            mvc.perform(get("/entries")).andExpect(status().isUnauthorized());
             mvc.perform(post("/entries").contentType(MediaType.APPLICATION_JSON).content("{\"plate\": \"ABC123\"}"))
                     .andExpect(status().isUnauthorized());
+        }
+
+        private ResultActions history(String query) throws Exception {
+            return mvc.perform(get("/entries" + query).header("Authorization", adminBearer));
+        }
+
+        private void setEntryTime(String plate, String isoTime) {
+            jdbc.update("UPDATE vehicle_entries SET entry_time = ? WHERE plate = ?",
+                    Timestamp.from(Instant.parse(isoTime)), plate);
+        }
+
+        @Test
+        void historyKeepsClosedEntriesMostRecentFirst() throws Exception {
+            enter("AAA111");
+            enter("BBB22C");
+            registerExit("AAA111").andExpect(status().isOk());
+
+            history("")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(2))
+                    .andExpect(jsonPath("$.totalPages").value(1))
+                    .andExpect(jsonPath("$.page").value(0))
+                    .andExpect(jsonPath("$.size").value(20))
+                    .andExpect(jsonPath("$.content[0].plate").value("BBB22C"))
+                    .andExpect(jsonPath("$.content[0].status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.content[0].exitTime").value(nullValue()))
+                    .andExpect(jsonPath("$.content[1].plate").value("AAA111"))
+                    .andExpect(jsonPath("$.content[1].status").value("CLOSED"))
+                    .andExpect(jsonPath("$.content[1].space.code").value("C-01"))
+                    .andExpect(jsonPath("$.content[1].exitTime").value(matchesPattern(ISO_UTC_SECONDS)))
+                    .andExpect(jsonPath("$.content[1].durationMinutes").isNumber());
+        }
+
+        @Test
+        void aPlateThatEnteredTwiceHasTwoRecords() throws Exception {
+            enter("ABC123");
+            registerExit("ABC123").andExpect(status().isOk());
+            enter("ABC123");
+
+            history("?plate=ABC123").andExpect(jsonPath("$.totalElements").value(2));
+        }
+
+        @Test
+        void historyShowsWhoRegisteredEachEntry() throws Exception {
+            mvc.perform(post("/entries")
+                            .header("Authorization", createOperatorBearer())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"plate\": \"AAA111\"}"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.registeredBy.name").value("Operator"));
+            enter("BBB222").andExpect(jsonPath("$.registeredBy.name").value("Administrador"));
+
+            registerExit("AAA111")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.registeredBy.name").value("Operator"));
+            history("")
+                    .andExpect(jsonPath("$.content[0].registeredBy.name").value("Administrador"))
+                    .andExpect(jsonPath("$.content[0].registeredBy.id").isNumber())
+                    .andExpect(jsonPath("$.content[0].registeredBy.password").doesNotExist())
+                    .andExpect(jsonPath("$.content[1].registeredBy.name").value("Operator"));
+        }
+
+        @Test
+        void entriesStoredBeforeRecordingTheOperatorHaveNone() throws Exception {
+            enter("AAA111");
+            jdbc.update("UPDATE vehicle_entries SET registered_by_id = NULL");
+
+            history("")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].registeredBy").value(nullValue()));
+            registerExit("AAA111")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.registeredBy").value(nullValue()));
+        }
+
+        @Test
+        void historyCanBeFilteredByPartOfThePlateInAnyFormat() throws Exception {
+            enter("ABC123");
+            enter("ABD456");
+            enter("XYZ789");
+
+            history("?plate=ab").andExpect(jsonPath("$.totalElements").value(2));
+            history("?plate=c-12")
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].plate").value("ABC123"));
+            history("?plate=NOPE").andExpect(jsonPath("$.totalElements").value(0));
+            history("?plate=---").andExpect(jsonPath("$.totalElements").value(3));
+        }
+
+        @Test
+        void historyCanBeFilteredByEntryDate() throws Exception {
+            enter("AAA111");
+            enter("BBB222");
+            enter("CCC333");
+            setEntryTime("AAA111", "2026-10-01T10:00:00Z");
+            setEntryTime("BBB222", "2026-10-02T10:00:00Z");
+            setEntryTime("CCC333", "2026-10-03T10:00:00Z");
+
+            history("?from=2026-10-02T10:00:00Z")
+                    .andExpect(jsonPath("$.totalElements").value(2))
+                    .andExpect(jsonPath("$.content[0].plate").value("CCC333"));
+            history("?to=2026-10-02T10:00:00Z")
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].plate").value("AAA111"));
+            history("?from=2026-10-02T00:00:00Z&to=2026-10-03T00:00:00Z&plate=BBB")
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].plate").value("BBB222"));
+        }
+
+        @Test
+        void historyIsPaginated() throws Exception {
+            enter("AAA111");
+            enter("BBB222");
+            enter("CCC333");
+
+            history("?size=2")
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[0].plate").value("CCC333"))
+                    .andExpect(jsonPath("$.totalElements").value(3))
+                    .andExpect(jsonPath("$.totalPages").value(2));
+            history("?size=2&page=1")
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].plate").value("AAA111"))
+                    .andExpect(jsonPath("$.page").value(1));
+            history("?size=2&page=9").andExpect(status().isOk()).andExpect(jsonPath("$.content", hasSize(0)));
+        }
+
+        @Test
+        void historyRejectsInvalidParameters() throws Exception {
+            history("?page=-1")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors.page").value("La página no puede ser negativa"));
+            history("?size=0")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors.size").value("El tamaño de página debe estar entre 1 y 100"));
+            history("?size=101").andExpect(status().isBadRequest());
+            history("?from=2026-10-03T00:00:00Z&to=2026-10-01T00:00:00Z")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors.from").value("La fecha inicial no puede ser posterior a la final"));
+            history("?from=ayer")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Valor inválido para el parámetro 'from'"));
+        }
+
+        @Test
+        void operatorCanReadTheHistory() throws Exception {
+            enter("ABC123");
+
+            mvc.perform(get("/entries").header("Authorization", createOperatorBearer()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(1));
         }
     }
 

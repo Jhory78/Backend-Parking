@@ -55,6 +55,7 @@ class SprintOneAcceptanceTest {
     /** The application never deletes accounts (RF-45), so tests clean up with SQL. */
     @BeforeEach
     void deleteOperators() {
+        jdbc.update("DELETE FROM vehicle_entries");
         jdbc.update("DELETE FROM users WHERE email <> ?", ADMIN_EMAIL);
     }
 

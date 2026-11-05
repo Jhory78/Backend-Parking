@@ -7,16 +7,21 @@ import com.parking.application.port.in.RegisterEntryUseCase;
 import com.parking.application.port.in.RegisterExitUseCase;
 import com.parking.application.port.in.SpaceAllocationUseCase;
 import com.parking.application.port.out.PlateRecognitionPort;
+import com.parking.application.port.out.UserRepositoryPort;
 import com.parking.application.port.out.VehicleEntryRepositoryPort;
+import com.parking.domain.entity.EntryHistoryPage;
+import com.parking.domain.entity.EntryHistoryQuery;
 import com.parking.domain.entity.LicensePlate;
 import com.parking.domain.entity.ParkingSpace;
 import com.parking.domain.entity.PlateReading;
 import com.parking.domain.entity.PlateRecognition;
+import com.parking.domain.entity.User;
 import com.parking.domain.entity.VehicleEntry;
 import com.parking.domain.entity.VehicleType;
 import com.parking.domain.exception.ActiveEntryNotFoundException;
 import com.parking.domain.exception.FieldValidationException;
 import com.parking.domain.exception.PlateNotRecognizedException;
+import com.parking.domain.exception.UserNotFoundException;
 import com.parking.domain.exception.VehicleAlreadyInsideException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,12 +47,14 @@ public class EntryService implements RecognizePlateUseCase, RegisterEntryUseCase
 
     static final String IMAGE_FIELD = "image";
     static final int MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+    static final int MAX_HISTORY_PAGE_SIZE = 100;
 
     private static final byte[] JPEG_SIGNATURE = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
 
     private final PlateRecognitionPort plateRecognition;
     private final VehicleEntryRepositoryPort entryRepository;
+    private final UserRepositoryPort userRepository;
     private final SpaceAllocationUseCase spaceAllocation;
     private final Clock clock;
 
@@ -78,9 +85,11 @@ public class EntryService implements RecognizePlateUseCase, RegisterEntryUseCase
             throw new VehicleAlreadyInsideException(plate.value());
         }
 
+        User operator = userRepository.findById(command.operatorId()).orElseThrow(UserNotFoundException::new);
+
         Instant entryTime = now();
         ParkingSpace space = spaceAllocation.assignFirstAvailable(vehicleType, plate, entryTime);
-        return entryRepository.save(VehicleEntry.register(plate, vehicleType, space, entryTime));
+        return entryRepository.save(VehicleEntry.register(plate, vehicleType, space, entryTime, operator));
     }
 
     @Override
@@ -99,6 +108,24 @@ public class EntryService implements RecognizePlateUseCase, RegisterEntryUseCase
     @Override
     public List<VehicleEntry> findActiveEntries() {
         return entryRepository.findAllActive();
+    }
+
+    @Override
+    public EntryHistoryPage findHistory(EntryHistoryQuery query) {
+        if (query.page() < 0) {
+            throw new FieldValidationException("page", "La página no puede ser negativa");
+        }
+        if (query.size() < 1 || query.size() > MAX_HISTORY_PAGE_SIZE) {
+            throw new FieldValidationException("size",
+                    "El tamaño de página debe estar entre 1 y %d".formatted(MAX_HISTORY_PAGE_SIZE));
+        }
+        if (query.from() != null && query.to() != null && query.from().isAfter(query.to())) {
+            throw new FieldValidationException("from", "La fecha inicial no puede ser posterior a la final");
+        }
+
+        String plate = LicensePlate.normalize(query.plate());
+        return entryRepository.findHistory(new EntryHistoryQuery(
+                plate.isEmpty() ? null : plate, query.from(), query.to(), query.page(), query.size()));
     }
 
     /** RF-01: JPEG or PNG, checked by content (the declared content type can lie). */

@@ -4,6 +4,8 @@ import com.parking.application.port.in.FindEntriesUseCase;
 import com.parking.application.port.in.RecognizePlateUseCase;
 import com.parking.application.port.in.RegisterEntryUseCase;
 import com.parking.application.port.in.RegisterExitUseCase;
+import com.parking.domain.entity.EntryHistoryQuery;
+import com.parking.infrastructure.adapter.in.rest.dto.EntryHistoryResponse;
 import com.parking.infrastructure.adapter.in.rest.dto.EntryResponse;
 import com.parking.infrastructure.adapter.in.rest.dto.PlateRecognitionResponse;
 import com.parking.infrastructure.adapter.in.rest.dto.RegisterEntryRequest;
@@ -14,16 +16,19 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -49,8 +54,9 @@ public class EntryController {
     /** RF-03..11: registers the entry confirmed by the operator and assigns a space. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public EntryResponse registerEntry(@Valid @RequestBody RegisterEntryRequest request) {
-        return mapper.toResponse(registerEntryUseCase.registerEntry(mapper.toCommand(request)));
+    public EntryResponse registerEntry(@Valid @RequestBody RegisterEntryRequest request,
+                                       @AuthenticationPrincipal(expression = "id") Long currentUserId) {
+        return mapper.toResponse(registerEntryUseCase.registerEntry(mapper.toCommand(request, currentUserId)));
     }
 
     /** Closes the active entry of the plate and frees its space. */
@@ -63,5 +69,15 @@ public class EntryController {
     @GetMapping(ApiRoutes.ENTRIES_ACTIVE)
     public List<EntryResponse> findActiveEntries() {
         return mapper.toResponses(findEntriesUseCase.findActiveEntries());
+    }
+
+    /** RF-10: entry history, closed entries included, most recent first. */
+    @GetMapping
+    public EntryHistoryResponse findHistory(@RequestParam(required = false) String plate,
+                                            @RequestParam(required = false) Instant from,
+                                            @RequestParam(required = false) Instant to,
+                                            @RequestParam(defaultValue = "0") int page,
+                                            @RequestParam(defaultValue = "20") int size) {
+        return mapper.toResponse(findEntriesUseCase.findHistory(new EntryHistoryQuery(plate, from, to, page, size)));
     }
 }

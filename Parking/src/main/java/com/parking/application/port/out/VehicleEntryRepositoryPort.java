@@ -1,5 +1,7 @@
 package com.parking.application.port.out;
 
+import com.parking.domain.entity.EntryHistoryPage;
+import com.parking.domain.entity.EntryHistoryQuery;
 import com.parking.domain.entity.VehicleEntry;
 
 import java.util.List;
@@ -19,4 +21,7 @@ public interface VehicleEntryRepositoryPort {
 
     /** Most recent entry first. */
     List<VehicleEntry> findAllActive();
+
+    /** Most recent entry first. */
+    EntryHistoryPage findHistory(EntryHistoryQuery query);
 }

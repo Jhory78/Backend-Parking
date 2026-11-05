@@ -60,9 +60,14 @@ public class VehicleEntry {
     @Column(name = "active_plate", unique = true, length = 10)
     private String activePlate;
 
+    /** Null in the entries stored before this was recorded. */
+    @ManyToOne
+    @JoinColumn(name = "registered_by_id")
+    private User registeredBy;
+
     /** RF-05, RF-10: the vehicle enters and parks in {@code space}, already assigned to it. */
     public static VehicleEntry register(LicensePlate plate, VehicleType vehicleType, ParkingSpace space,
-                                        Instant entryTime) {
+                                        Instant entryTime, User registeredBy) {
         if (space.getVehicleType() != vehicleType) {
             throw new IllegalArgumentException(
                     "Space %s is not for %s".formatted(space.getCode(), vehicleType));
@@ -74,6 +79,7 @@ public class VehicleEntry {
         entry.entryTime = entryTime;
         entry.status = EntryStatus.ACTIVE;
         entry.activePlate = plate.value();
+        entry.registeredBy = registeredBy;
         return entry;
     }
 

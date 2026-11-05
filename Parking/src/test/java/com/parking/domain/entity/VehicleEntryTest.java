@@ -13,10 +13,18 @@ class VehicleEntryTest {
     private static final LicensePlate PLATE = LicensePlate.of("ABC123");
 
     private final ParkingSpace carSpace = ParkingSpace.available("C-01", VehicleType.CAR);
+    private final User operator = User.create("Operator", "operator@parking.com", "hash", Role.OPERATOR);
+
+    @Test
+    void newEntryRecordsWhoRegisteredIt() {
+        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME, operator);
+
+        assertThat(entry.getRegisteredBy()).isSameAs(operator);
+    }
 
     @Test
     void newEntryIsActive() {
-        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME);
+        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME, operator);
 
         assertThat(entry.isActive()).isTrue();
         assertThat(entry.getStatus()).isEqualTo(EntryStatus.ACTIVE);
@@ -28,7 +36,7 @@ class VehicleEntryTest {
 
     @Test
     void closingSetsTheExitTimeAndDuration() {
-        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME);
+        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME, operator);
 
         entry.close(ENTRY_TIME.plusSeconds(95 * 60 + 59));
 
@@ -39,7 +47,7 @@ class VehicleEntryTest {
 
     @Test
     void cannotBeClosedTwice() {
-        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME);
+        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME, operator);
         entry.close(ENTRY_TIME.plusSeconds(60));
 
         assertThatThrownBy(() -> entry.close(ENTRY_TIME.plusSeconds(120)))
@@ -48,7 +56,7 @@ class VehicleEntryTest {
 
     @Test
     void exitCannotBeBeforeTheEntry() {
-        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME);
+        VehicleEntry entry = VehicleEntry.register(PLATE, VehicleType.CAR, carSpace, ENTRY_TIME, operator);
 
         assertThatThrownBy(() -> entry.close(ENTRY_TIME.minusSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -56,7 +64,7 @@ class VehicleEntryTest {
 
     @Test
     void spaceMustMatchTheVehicleType() {
-        assertThatThrownBy(() -> VehicleEntry.register(PLATE, VehicleType.MOTORCYCLE, carSpace, ENTRY_TIME))
+        assertThatThrownBy(() -> VehicleEntry.register(PLATE, VehicleType.MOTORCYCLE, carSpace, ENTRY_TIME, operator))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }
